@@ -24,6 +24,12 @@ class DnsAgent:
         self.username = os.environ.get("NAMEDOTCOM_API_USERNAME", None)
         self.token = os.environ.get("NAMEDOTCOM_API_TOKEN", None)
 
+        if self.endpoint is None:
+            logger.error(
+                "name.com api endpoint is missing. did you prepare the .env file?"
+            )
+            exit()
+
         self.get_my_domains()
 
     def get_my_domains(self):
@@ -45,7 +51,7 @@ class DnsAgent:
         response = self.get_request(url)
 
         logger.info(response.status_code)
-        #logger.info(response.text)
+        # logger.info(response.text)
 
         is_record_existing = False
         if "records" in json.loads(response.text):
@@ -82,7 +88,7 @@ class DnsAgent:
         response = self.post_request(url, payload)
 
         logger.info(response.status_code)
-        #logger.info(response.text)
+        # logger.info(response.text)
 
     def get_request(self, url):
         parsed = urlparse(url)
@@ -101,7 +107,7 @@ class DnsAgent:
         response = requests.post(url, json=payload, auth=(self.username, self.token))
 
         logger.info(response.status_code)
-        #logger.info(response.text)
+        # logger.info(response.text)
 
         return response
 

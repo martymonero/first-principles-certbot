@@ -290,5 +290,3 @@ if __name__ == "__main__":
         f.write(response.content)
 
     logger.info(f"successfully retrieved certificate for {root_domain}")
-
-    exit()
