@@ -194,6 +194,7 @@ def order_cert(raw_domain_list):
 
     logger.info(f"ORDER URL: {order_url}")
 
+    dns_record_url_list = []
     while not order["status"] == "ready":
 
         for authz_url in order["authorizations"]:
@@ -242,8 +243,12 @@ def order_cert(raw_domain_list):
                     host = f"{host}.{extract_result.subdomain}"
 
                 logger.info(f"HOST FOR TXT RECORD: {host}")
-                dns_agent.create_record(root_domain, host, "TXT", txt_record)
+                record_url = dns_agent.create_record(root_domain, host, "TXT", txt_record)
 
+                if not record_url is None:
+                    dns_record_url_list.append(record_url)
+
+                #TODO: move the check outside this loop to speed up the process even more -> create 'order' struct
                 external_records = dns_agent.get_external_records(
                     f"_acme-challenge.{current_domain}", "TXT"
                 )
@@ -288,6 +293,11 @@ def order_cert(raw_domain_list):
         f.write(response.content)
 
     logger.info(f"successfully retrieved certificate for {root_domain}")
+
+    #clean up dns records to speed up the next ordering
+    for dns_record_url in dns_record_url_list:
+        logger.info(f"removing dns record: {dns_record_url}")
+        dns_agent.delete_request(dns_record_url)
 
 
 if __name__ == "__main__":

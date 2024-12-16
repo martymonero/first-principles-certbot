@@ -55,23 +55,26 @@ class DnsAgent:
         # logger.info(response.text)
 
         is_record_existing = False
+        record_url = None
         if "records" in json.loads(response.text):
             for record in json.loads(response.text)["records"]:
                 if not "host" in record:
                     continue
 
                 if record["host"] == host and record["type"] == record_type:
+                    record_id = record["id"]
+
+                    record_url = f"{url}/{record_id}"
 
                     if record["answer"] == answer:
                         is_record_existing = True
                     else:
-                        record_id = record["id"]
                         logger.info(
                             f"dns record with same host: {host} and type: {record_type} already exists"
                         )
                         logger.info(f"deleting old record with id: {record_id}")
 
-                        self.delete_request(f"{url}/{record_id}")
+                        self.delete_request(record_url)
 
 
                         logger.info(f"sleeping to avoid race conditions")
@@ -95,6 +98,9 @@ class DnsAgent:
         logger.info(response.status_code)
         # logger.info(response.text)
 
+        return record_url
+
+    
     def get_request(self, url):
         parsed = urlparse(url)
 
