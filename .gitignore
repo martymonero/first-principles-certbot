@@ -1,6 +1,8 @@
 .DS_Store
 
 .env
+.domains.json
+archive
 account/*.json
 orders/*.csr
 orders/*.pem

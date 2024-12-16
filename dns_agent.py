@@ -4,6 +4,7 @@ import dotenv
 import json
 import os
 import requests
+import time
 
 from loguru import logger
 from urllib.parse import urljoin, urlparse
@@ -71,6 +72,10 @@ class DnsAgent:
                         logger.info(f"deleting old record with id: {record_id}")
 
                         self.delete_request(f"{url}/{record_id}")
+
+
+                        logger.info(f"sleeping to avoid race conditions")
+                        time.sleep(5 * 60)
 
         if is_record_existing:
 

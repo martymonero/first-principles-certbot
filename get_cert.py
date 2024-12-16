@@ -1,4 +1,5 @@
 import base64
+import glob
 import hashlib
 import json
 import os
@@ -7,7 +8,9 @@ import tldextract
 
 from acme_agent import AcmeAgent
 from dns_agent import DnsAgent
+from datetime import date
 from loguru import logger
+from pathlib import Path
 
 """
 	+-------------------+--------------------------------+--------------+
@@ -126,6 +129,16 @@ def get_root_domain(domain_list):
     return f"{extract_result.domain}.{extract_result.suffix}"
 
 
+def reduce_domain_to_root(domain) -> str | None:
+    try:
+        extract_result = tldextract.extract(domain.lower())
+    except Exception as e:
+        logger.error(str(e))
+        return None
+
+    return f"{extract_result.domain}.{extract_result.suffix}"
+
+
 def filter_domain_list(domain_list, root_domain):
     new_domain_list = []
     for domain in domain_list:
@@ -148,25 +161,10 @@ def filter_domain_list(domain_list, root_domain):
     return new_domain_list
 
 
-if __name__ == "__main__":
-    import argparse
+def order_cert(raw_domain_list):
+    root_domain = get_root_domain(raw_domain_list)
 
-    parser = argparse.ArgumentParser(
-        description="Order and renew certificates via the Let's Encrypt ACME API and name.com API"
-    )
-    parser.add_argument(
-        "-d", "--domain", type=str, action="append", help="Domain Name", required=True
-    )
-
-    args = parser.parse_args()
-
-    domain_list = args.domain
-
-    root_domain = get_root_domain(domain_list)
-
-    # for now , only sub domains from the first domain are allowed
-    # they will be added as SANs to the CSR
-    domain_list = filter_domain_list(domain_list, root_domain)
+    domain_list = filter_domain_list(raw_domain_list, root_domain)
 
     cert_file_path = f"./orders/{root_domain}.fullchain.pem"
 
@@ -290,3 +288,62 @@ if __name__ == "__main__":
         f.write(response.content)
 
     logger.info(f"successfully retrieved certificate for {root_domain}")
+
+
+if __name__ == "__main__":
+    # .domains.json overrides everything and has no safety railings ;)
+    if Path(Path(__file__).parent / ".domains.json").exists():
+
+        # we just collect the unique root domains and order a wildcard cert for each
+        raw_domain_list = json.loads(
+            Path(Path(__file__).parent / ".domains.json").read_text()
+        )
+
+        root_domain_list = []
+        for domain in raw_domain_list:
+
+            root_domain = reduce_domain_to_root(domain)
+
+            if not root_domain in root_domain_list:
+                root_domain_list.append(root_domain)
+
+        order_path = Path(Path(__file__).parent / "orders")
+        for root_domain in root_domain_list:
+
+            # move old orders into archive folder
+            for f in order_path.glob(f"{root_domain}.*"):
+                dest_folder = f.parent / "archive"
+                dest_file_name = today = date.today().isoformat() + "_" + f.name
+
+                if not dest_folder.exists():
+                    dest_folder.mkdir(exist_ok=True)
+
+                f.rename(dest_folder / dest_file_name)
+
+            domain_list = [root_domain, "*." + root_domain]
+
+            order_cert(domain_list)
+
+    else:
+        # for now , only sub domains from the first domain are allowed
+        # they will be added as SANs to the CSR
+
+        import argparse
+
+        parser = argparse.ArgumentParser(
+            description="Order and renew certificates via the Let's Encrypt ACME API and name.com API"
+        )
+        parser.add_argument(
+            "-d",
+            "--domain",
+            type=str,
+            action="append",
+            help="Domain Name",
+            required=True,
+        )
+
+        args = parser.parse_args()
+
+        domain_list = args.domain
+
+        order_cert(domain_list)
